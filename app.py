@@ -14,10 +14,27 @@ GOOGLE_BOOKS_API_KEY = st.secrets["GOOGLE_BOOKS_API_KEY"]
 # Create directories for storing files
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+LIBRARY_FILE = Path("library_data.json")
 
-# Session state initialization
+# Session state initialization with persistence
 if 'library' not in st.session_state:
-    st.session_state.library = []
+    if LIBRARY_FILE.exists():
+        try:
+            with open(LIBRARY_FILE, 'r') as f:
+                st.session_state.library = json.load(f)
+        except Exception as e:
+            st.error(f"Error loading library data: {e}")
+            st.session_state.library = []
+    else:
+        st.session_state.library = []
+
+# Function to save library data
+def save_library():
+    try:
+        with open(LIBRARY_FILE, 'w') as f:
+            json.dump(st.session_state.library, f)
+    except Exception as e:
+        st.error(f"Error saving library data: {e}")
 
 def extract_pdf_metadata(file_path):
     """Extract metadata and content from PDF files"""
@@ -199,6 +216,7 @@ if page == "Upload Books":
         # Add to library
         if st.button("Add to Library"):
             st.session_state.library.append(book_data)
+            save_library()  # Save to file
             st.success("Book added to your library!")
 
 elif page == "My Library":
@@ -269,6 +287,9 @@ elif page == "Recommendations":
                     st.write(f"By {book['author']}")
         else:
             st.write("No recommendations available yet.")
+
+
+
 
 
 
