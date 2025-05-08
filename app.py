@@ -3,7 +3,6 @@ import os
 import PyPDF2
 import requests
 import json
-import base64
 from pathlib import Path
 
 # Set up page configuration
@@ -15,27 +14,12 @@ GOOGLE_BOOKS_API_KEY = st.secrets["GOOGLE_BOOKS_API_KEY"]
 # Create directories for storing files
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
-LIBRARY_FILE = Path("library_data.json")
 
-# Session state initialization with persistence
+# Session state initialization
 if 'library' not in st.session_state:
-    if LIBRARY_FILE.exists():
-        try:
-            with open(LIBRARY_FILE, 'r') as f:
-                st.session_state.library = json.load(f)
-        except Exception as e:
-            st.error(f"Error loading library data: {e}")
-            st.session_state.library = []
-    else:
-        st.session_state.library = []
-
-# Function to save library data
-def save_library():
-    try:
-        with open(LIBRARY_FILE, 'w') as f:
-            json.dump(st.session_state.library, f)
-    except Exception as e:
-        st.error(f"Error saving library data: {e}")
+    st.session_state.library = []
+if 'selected_book' not in st.session_state:
+    st.session_state.selected_book = None
 
 def extract_pdf_metadata(file_path):
     """Extract metadata and content from PDF files"""
@@ -141,11 +125,10 @@ def fetch_book_info(title, author, content_preview="", is_resume=False):
                 'thumbnail': None
             }
     
-    # Add default thumbnail for all cases where thumbnail is None
     return {
         'title': title,
         'author': author,
-        'genre': category,
+        'genre': "Document",
         'description': content_preview[:200] + "...",
         'thumbnail': "https://cdn-icons-png.flaticon.com/512/337/337946.png"  # Default document icon
     }
@@ -200,16 +183,13 @@ if page == "Upload Books":
         
         # Display book info
         st.success(f"File uploaded: {uploaded_file.name}")
-
+        
         col1, col2 = st.columns([1, 3])
         with col1:
-            try:
-                if book_data['thumbnail']:
-                    st.image(book_data['thumbnail'], width=150)
-                else:
-                    st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=150)
-            except Exception:
-                st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=150)
+            if book_data['thumbnail']:
+                st.image(book_data['thumbnail'], width=150)
+            else:
+                st.write("No thumbnail available")
         
         with col2:
             st.subheader(book_data['title'])
@@ -221,7 +201,6 @@ if page == "Upload Books":
         # Add to library
         if st.button("Add to Library"):
             st.session_state.library.append(book_data)
-            save_library()  # Save to file
             st.success("Book added to your library!")
 
 elif page == "My Library":
@@ -230,9 +209,29 @@ elif page == "My Library":
     if not st.session_state.library:
         st.info("Your library is empty. Upload some books!")
     else:
+        # Add search functionality
+        search_query = st.text_input("Search your library", "")
+        
+        # Filter books based on search query
+        filtered_books = st.session_state.library
+        if search_query:
+            filtered_books = [book for book in st.session_state.library if 
+                             search_query.lower() in book['title'].lower() or 
+                             search_query.lower() in book['author'].lower() or
+                             search_query.lower() in book['genre'].lower()]
+        
+        # Add sorting options
+        sort_by = st.selectbox("Sort by", ["Title", "Author", "Genre"])
+        if sort_by == "Title":
+            filtered_books = sorted(filtered_books, key=lambda x: x['title'])
+        elif sort_by == "Author":
+            filtered_books = sorted(filtered_books, key=lambda x: x['author'])
+        else:
+            filtered_books = sorted(filtered_books, key=lambda x: x['genre'])
+        
         # Group books by genre
         genres = {}
-        for book in st.session_state.library:
+        for book in filtered_books:
             genre = book['genre']
             if genre not in genres:
                 genres[genre] = []
@@ -245,66 +244,115 @@ elif page == "My Library":
             
             for i, book in enumerate(books):
                 with cols[i % 3]:
-                    try:
-                        if book['thumbnail']:
+                    if book['thumbnail']:
+                        try:
                             thumbnail_url = book['thumbnail'].replace('http://', 'https://')
                             st.image(thumbnail_url, width=100)
-                        else:
-                            st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=100)
-                    except Exception:
-                        st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=100)
-                    
+                        except Exception:
+                            st.write("📚") # Fallback book emoji if image fails
                     st.write(f"**{book['title']}**")
                     st.write(f"By {book['author']}")
                     st.write(f"{book['pages']} pages")
                     
-                    # Add buttons for viewing and downloading
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button(f"View 👁️", key=f"view_{i}_{genre}"):
-                            st.session_state.selected_book = book
-                            st.rerun()  # Updated from experimental_rerun
-                    with col2:
-                        with open(book['file_path'], "rb") as file:
-                            pdf_bytes = file.read()
-                        st.download_button(
-                            label="Download 📥",
-                            data=pdf_bytes,
-                            file_name=Path(book['file_path']).name,
-                            mime="application/pdf",
-                            key=f"download_{i}_{genre}"
-                        )
+                    # Add button to view book details
+                    if st.button(f"View Details", key=f"view_{book['title']}_{i}"):
+                        st.session_state.selected_book = book
+                        st.experimental_rerun()
 
 elif page == "View Book":
-    st.header("View Book")
+    st.header("Book Details")
     
-    if 'selected_book' not in st.session_state:
-        st.session_state.selected_book = None
-    
-    if st.session_state.selected_book:
-        book = st.session_state.selected_book
-        st.subheader(book['title'])
-        st.write(f"**Author:** {book['author']}")
-        
-        # Display PDF using HTML embed
-        file_path = book['file_path']
-        with open(file_path, "rb") as f:
-            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-        
-        # Embed PDF viewer
-        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
-        st.markdown(pdf_display, unsafe_allow_html=True)
-        
-        # Download button
-        with open(file_path, "rb") as file:
-            st.download_button(
-                label="Download PDF",
-                data=file,
-                file_name=Path(file_path).name,
-                mime="application/pdf"
-            )
+    if st.session_state.selected_book is None:
+        st.info("Select a book from your library to view details.")
     else:
-        st.info("Select a book from 'My Library' to view it here.")
+        book = st.session_state.selected_book
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            if book['thumbnail']:
+                try:
+                    thumbnail_url = book['thumbnail'].replace('http://', 'https://')
+                    st.image(thumbnail_url, width=200)
+                except Exception:
+                    st.write("📚") # Fallback book emoji
+            
+            # Add rating system
+            st.write("### Rate this book")
+            rating = st.slider("Your rating", 1, 5, 3)
+            if st.button("Save Rating"):
+                if 'rating' not in book:
+                    book['rating'] = rating
+                    st.success("Rating saved!")
+                else:
+                    book['rating'] = rating
+                    st.success("Rating updated!")
+        
+        with col2:
+            st.title(book['title'])
+            st.write(f"**Author:** {book['author']}")
+            st.write(f"**Genre:** {book['genre']}")
+            st.write(f"**Pages:** {book['pages']}")
+            
+            # Display rating if available
+            if 'rating' in book:
+                st.write(f"**Your Rating:** {'⭐' * book['rating']}")
+            
+            st.write("### Description")
+            st.write(book['description'])
+            
+            # Add notes feature
+            st.write("### Your Notes")
+            if 'notes' not in book:
+                book['notes'] = ""
+            
+            notes = st.text_area("Add your notes about this book", book['notes'], height=150)
+            if st.button("Save Notes"):
+                book['notes'] = notes
+                st.success("Notes saved!")
+            
+            # Option to open the file
+            if st.button("Open PDF"):
+                try:
+                    with open(book['file_path'], "rb") as file:
+                        pdf_bytes = file.read()
+                    st.download_button(
+                        label="Download PDF",
+                        data=pdf_bytes,
+                        file_name=os.path.basename(book['file_path']),
+                        mime="application/pdf"
+                    )
+                except Exception as e:
+                    st.error(f"Error opening file: {e}")
+        
+        # Similar books section
+        st.write("### Similar Books")
+        similar_books = [b for b in st.session_state.library 
+                        if b['genre'] == book['genre'] and b != book][:3]
+        
+        if similar_books:
+            cols = st.columns(len(similar_books))
+            for i, similar_book in enumerate(similar_books):
+                with cols[i]:
+                    if similar_book['thumbnail']:
+                        try:
+                            thumbnail_url = similar_book['thumbnail'].replace('http://', 'https://')
+                            st.image(thumbnail_url, width=100)
+                        except Exception:
+                            st.write("📚")
+                    st.write(f"**{similar_book['title']}**")
+                    st.write(f"By {similar_book['author']}")
+                    
+                    if st.button(f"View", key=f"similar_{i}"):
+                        st.session_state.selected_book = similar_book
+                        st.experimental_rerun()
+        else:
+            st.write("No similar books found in your library.")
+        
+        # Button to return to library
+        if st.button("Back to Library"):
+            st.session_state.selected_book = None
+            st.experimental_rerun()
 
 elif page == "Recommendations":
     st.header("Recommendations")
@@ -340,5 +388,16 @@ elif page == "Recommendations":
                             st.write("📚") # Fallback book emoji
                     st.write(f"**{book['title']}**")
                     st.write(f"By {book['author']}")
+                    
+                    # Add button to view details
+                    if st.button(f"View Details", key=f"rec_{i}"):
+                        st.session_state.selected_book = book
+                        st.experimental_rerun()
         else:
             st.write("No recommendations available yet.")
+
+
+
+
+
+
