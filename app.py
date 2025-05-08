@@ -263,7 +263,7 @@ elif page == "My Library":
                     with col1:
                         if st.button(f"View 👁️", key=f"view_{i}_{genre}"):
                             st.session_state.selected_book = book
-                            st.experimental_rerun()  # Switch to View Book page
+                            st.rerun()  # Updated from experimental_rerun
                     with col2:
                         with open(book['file_path'], "rb") as file:
                             pdf_bytes = file.read()
@@ -342,17 +342,3 @@ elif page == "Recommendations":
                     st.write(f"By {book['author']}")
         else:
             st.write("No recommendations available yet.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
