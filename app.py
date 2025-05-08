@@ -4,6 +4,7 @@ import PyPDF2
 import requests
 import json
 from pathlib import Path
+import base64
 
 # Set up page configuration
 st.set_page_config(page_title="E-Library Organizer", layout="wide")
@@ -162,7 +163,7 @@ st.title("E-Library Organizer")
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Upload Books", "My Library", "Recommendations"])
+page = st.sidebar.radio("Go to", ["Upload Books", "My Library", "View Book", "Recommendations"])
 
 if page == "Upload Books":
     st.header("Upload Books & Documents")
@@ -246,16 +247,64 @@ elif page == "My Library":
                 with cols[i % 3]:
                     try:
                         if book['thumbnail']:
-                            # Use HTTPS instead of HTTP if that's the issue
                             thumbnail_url = book['thumbnail'].replace('http://', 'https://')
                             st.image(thumbnail_url, width=100)
                         else:
                             st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=100)
                     except Exception:
                         st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=100)
+                    
                     st.write(f"**{book['title']}**")
                     st.write(f"By {book['author']}")
                     st.write(f"{book['pages']} pages")
+                    
+                    # Add buttons for viewing and downloading
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.button(f"View 👁️", key=f"view_{i}_{genre}"):
+                            st.session_state.selected_book = book
+                            st.experimental_rerun()  # Switch to View Book page
+                    with col2:
+                        with open(book['file_path'], "rb") as file:
+                            pdf_bytes = file.read()
+                        st.download_button(
+                            label="Download 📥",
+                            data=pdf_bytes,
+                            file_name=Path(book['file_path']).name,
+                            mime="application/pdf",
+                            key=f"download_{i}_{genre}"
+                        )
+
+elif page == "View Book":
+    st.header("View Book")
+    
+    if 'selected_book' not in st.session_state:
+        st.session_state.selected_book = None
+    
+    if st.session_state.selected_book:
+        book = st.session_state.selected_book
+        st.subheader(book['title'])
+        st.write(f"**Author:** {book['author']}")
+        
+        # Display PDF using HTML embed
+        file_path = book['file_path']
+        with open(file_path, "rb") as f:
+            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+        
+        # Embed PDF viewer
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="600" type="application/pdf"></iframe>'
+        st.markdown(pdf_display, unsafe_allow_html=True)
+        
+        # Download button
+        with open(file_path, "rb") as file:
+            st.download_button(
+                label="Download PDF",
+                data=file,
+                file_name=Path(file_path).name,
+                mime="application/pdf"
+            )
+    else:
+        st.info("Select a book from 'My Library' to view it here.")
 
 elif page == "Recommendations":
     st.header("Recommendations")
@@ -293,6 +342,8 @@ elif page == "Recommendations":
                     st.write(f"By {book['author']}")
         else:
             st.write("No recommendations available yet.")
+
+
 
 
 
