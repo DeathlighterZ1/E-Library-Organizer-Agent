@@ -140,10 +140,11 @@ def fetch_book_info(title, author, content_preview="", is_resume=False):
                 'thumbnail': None
             }
     
+    # Add default thumbnail for all cases where thumbnail is None
     return {
         'title': title,
         'author': author,
-        'genre': "Document",
+        'genre': category,
         'description': content_preview[:200] + "...",
         'thumbnail': "https://cdn-icons-png.flaticon.com/512/337/337946.png"  # Default document icon
     }
@@ -198,13 +199,16 @@ if page == "Upload Books":
         
         # Display book info
         st.success(f"File uploaded: {uploaded_file.name}")
-        
+
         col1, col2 = st.columns([1, 3])
         with col1:
-            if book_data['thumbnail']:
-                st.image(book_data['thumbnail'], width=150)
-            else:
-                st.write("No thumbnail available")
+            try:
+                if book_data['thumbnail']:
+                    st.image(book_data['thumbnail'], width=150)
+                else:
+                    st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=150)
+            except Exception:
+                st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=150)
         
         with col2:
             st.subheader(book_data['title'])
@@ -240,13 +244,15 @@ elif page == "My Library":
             
             for i, book in enumerate(books):
                 with cols[i % 3]:
-                    if book['thumbnail']:
-                        try:
+                    try:
+                        if book['thumbnail']:
                             # Use HTTPS instead of HTTP if that's the issue
                             thumbnail_url = book['thumbnail'].replace('http://', 'https://')
                             st.image(thumbnail_url, width=100)
-                        except Exception:
-                            st.write("📚") # Fallback book emoji if image fails
+                        else:
+                            st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=100)
+                    except Exception:
+                        st.image("https://cdn-icons-png.flaticon.com/512/337/337946.png", width=100)
                     st.write(f"**{book['title']}**")
                     st.write(f"By {book['author']}")
                     st.write(f"{book['pages']} pages")
@@ -287,6 +293,9 @@ elif page == "Recommendations":
                     st.write(f"By {book['author']}")
         else:
             st.write("No recommendations available yet.")
+
+
+
 
 
 
