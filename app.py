@@ -251,21 +251,6 @@ elif page == "My Library":
                     st.write(f"**{book['title']}**")
                     st.write(f"By {book['author']}")
                     st.write(f"{book['pages']} pages")
-                    
-                    # Add option to open the file
-                    if st.button(f"Open PDF", key=f"open_{book['title']}_{i}"):
-                        try:
-                            with open(book['file_path'], "rb") as file:
-                                pdf_bytes = file.read()
-                            st.download_button(
-                                label="Download PDF",
-                                data=pdf_bytes,
-                                file_name=os.path.basename(book['file_path']),
-                                mime="application/pdf",
-                                key=f"download_{book['title']}_{i}"
-                            )
-                        except Exception as e:
-                            st.error(f"Error opening file: {e}")
 
 elif page == "Recommendations":
     st.header("Recommendations")
@@ -301,23 +286,9 @@ elif page == "Recommendations":
                             st.write("📚") # Fallback book emoji
                     st.write(f"**{book['title']}**")
                     st.write(f"By {book['author']}")
-                    
-                    # Add option to open the file
-                    if st.button(f"Open PDF", key=f"rec_open_{book['title']}_{i}"):
-                        try:
-                            with open(book['file_path'], "rb") as file:
-                                pdf_bytes = file.read()
-                            st.download_button(
-                                label="Download PDF",
-                                data=pdf_bytes,
-                                file_name=os.path.basename(book['file_path']),
-                                mime="application/pdf",
-                                key=f"rec_download_{book['title']}_{i}"
-                            )
-                        except Exception as e:
-                            st.error(f"Error opening file: {e}")
         else:
             st.write("No recommendations available yet.")
+
 
 
 
