@@ -3,8 +3,8 @@ import os
 import PyPDF2
 import requests
 import json
-from pathlib import Path
 import base64
+from pathlib import Path
 
 # Set up page configuration
 st.set_page_config(page_title="E-Library Organizer", layout="wide")
@@ -342,6 +342,8 @@ elif page == "Recommendations":
                     st.write(f"By {book['author']}")
         else:
             st.write("No recommendations available yet.")
+
+
 
 
 
